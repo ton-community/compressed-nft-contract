@@ -9,21 +9,17 @@ global cell storage::nft_item_code;
 global slice storage::owner;
 global cell storage::content;
 global cell storage::royalty;
-global int storage::last_index;
 global cell storage::api_data;
-
-const int node_dict_key_len = 32;
 
 const int error::not_owner = 100;
 const int error::bad_proof = 101;
-const int error::index_too_high = 102;
-const int error::tree_full = 103;
-const int error::malformed_updates = 104;
+const int error::value_too_low = 102;
 
 const int op::claim = "op::claim"c;
 const int op::update = "op::update"c;
 
-const int item_init_value = 50000000;
+const int item_init_value = 30000000;
+const int minimum_claim_value = 85000000;
 
 () load_data() impure {
     slice ds = get_data().begin_parse();
@@ -34,7 +30,6 @@ const int item_init_value = 50000000;
     storage::owner = ds~load_msg_addr();
     storage::content = ds~load_ref();
     storage::royalty = ds~load_ref();
-    storage::last_index = ds~load_uint(256);
     storage::api_data = ds~load_ref();
 
     ds.end_parse();
@@ -48,7 +43,6 @@ const int item_init_value = 50000000;
         .store_slice(storage::owner)
         .store_ref(storage::content)
         .store_ref(storage::royalty)
-        .store_uint(storage::last_index, 256)
         .store_ref(storage::api_data)
         .end_cell());
 }
@@ -57,27 +51,18 @@ int hash_nodes(int a, int b) {
     return begin_cell().store_uint(a, 256).store_uint(b, 256).end_cell().cell_hash();
 }
 
-int get_node(cell p, int i) {
-    (slice v, int ok) = p.udict_get?(node_dict_key_len, i);
-    throw_unless(101, ok);
-    return v.preload_uint(256);
-}
-
-(cell, ()) set_node(cell p, int i, int v) {
-    p~udict_set_builder(node_dict_key_len, i, begin_cell().store_uint(v, 256));
-    return (p, ());
-}
-
 int check_proof(int root, cell proof, int leaf, int leaf_index, int depth) {
     int i = 0;
     int cur = leaf;
+    slice ps = proof.begin_parse();
     while (i < depth) {
         int is_right = (leaf_index >> i) & 1;
         if (is_right) {
-            cur = hash_nodes(proof.get_node(i), cur);
+            cur = hash_nodes(ps.preload_uint(256), cur);
         } else {
-            cur = hash_nodes(cur, proof.get_node(i));
+            cur = hash_nodes(cur, ps.preload_uint(256));
         }
+        ps = ps.preload_ref().begin_parse();
         i += 1;
     }
     return cur == root;
@@ -116,52 +101,46 @@ slice calculate_nft_item_address(cell state_init) {
 }
 
 () claim(int nft_index, cell nft_data, cell proof) impure {
-    throw_if(error::index_too_high, nft_index > storage::last_index);
-
     throw_unless(error::bad_proof, check_proof(storage::merkle_root, proof, nft_data.cell_hash(), nft_index, storage::merkle_depth));
 
     (slice owner, cell content) = nft_data.parse_nft_data();
 
-    deploy_nft_item(nft_index, item_init_value, begin_cell().store_slice(owner).store_ref(content).end_cell()); ;; inline the nft_data?
+    deploy_nft_item(nft_index, item_init_value, begin_cell().store_slice(owner).store_ref(content).end_cell());
 }
 
-() update(cell updates, int new_last_index, cell hashes) impure {
-    throw_if(error::tree_full, storage::last_index >= ((1 << storage::merkle_depth) - 1));
-    throw_unless(error::malformed_updates, new_last_index > storage::last_index);
-
-    int cur_left = (storage::last_index + 1) + (1 << storage::merkle_depth);
-    int i = storage::merkle_depth;
-    int last_node_hash = -1;
-    cell verification_hashes = hashes;
-    int zero_hash = 0;
-    while (i > 0) {
-        (slice v, int ok) = updates.udict_get?(node_dict_key_len, i);
-        if (ok) {
-            int node_index = v~load_uint(256);
-            int leaf_node_index = node_index << (storage::merkle_depth - i);
-            throw_unless(error::malformed_updates, leaf_node_index == cur_left); ;; does this verify that node_index belongs to depth
-            cur_left = leaf_node_index + (1 << (storage::merkle_depth - i));
-
-            int new_hash = v~load_uint(256);
-            last_node_hash = node_index >> 1;
-            hashes~set_node(last_node_hash, hash_nodes(hashes.get_node(node_index - 1), new_hash));
-            verification_hashes~set_node(last_node_hash, hash_nodes(verification_hashes.get_node(node_index - 1), zero_hash));
-        } elseif (last_node_hash != -1) {
-            int new_last_node_hash = last_node_hash >> 1;
-            hashes~set_node(new_last_node_hash, hash_nodes(hashes.get_node(last_node_hash - 1), hashes.get_node(last_node_hash)));
-            verification_hashes~set_node(new_last_node_hash, hash_nodes(verification_hashes.get_node(last_node_hash - 1), verification_hashes.get_node(last_node_hash)));
-            last_node_hash = new_last_node_hash;
+(int, int) process_update(cell update, tuple zh, int depth) {
+    slice cs = update.begin_parse();
+    int leaf = cs~load_int(1);
+    if (leaf) {
+        int proof = cs~load_int(1);
+        int hash = cs~load_uint(256);
+        if (proof) {
+            return (hash, hash);
+        } else { ;; update
+            return (zh.at(depth), hash);
         }
-        zero_hash = hash_nodes(zero_hash, zero_hash);
+    } else {
+        (int old_left, int new_left) = process_update(cs~load_ref(), zh, depth - 1);
+        (int old_right, int new_right) = process_update(cs~load_ref(), zh, depth - 1);
+        return (hash_nodes(old_left, old_right), hash_nodes(new_left, new_right));
+    }
+}
 
-        i -= 1;
+() update(cell update) impure {
+    tuple zh = empty_tuple();
+    zh~tpush(0);
+    int i = 0;
+    while (i < storage::merkle_depth - 1) {
+        int prev = zh.at(i);
+        zh~tpush(hash_nodes(prev, prev));
+        i += 1;
     }
 
-    throw_unless(error::malformed_updates, cur_left == (1 << (storage::merkle_depth + 1)));
-    throw_unless(error::malformed_updates, verification_hashes.get_node(1) == storage::merkle_root);
+    (int old_hash, int new_hash) = process_update(update, zh, storage::merkle_depth);
 
-    storage::merkle_root = hashes.get_node(1);
-    storage::last_index = new_last_index;
+    throw_unless(error::bad_proof, old_hash == storage::merkle_root);
+
+    storage::merkle_root = new_hash;
 
     save_data();
 }
@@ -198,15 +177,16 @@ slice calculate_nft_item_address(cell state_init) {
     int query_id = in_msg_body~load_uint(64);
 
     if (op == op::claim) {
+        throw_unless(error::value_too_low, msg_value >= minimum_claim_value);
+
         slice proof_data = in_msg_body~load_ref().begin_parse();
-        claim(proof_data~load_uint(256), proof_data~load_ref(), proof_data~load_ref());
+        claim(in_msg_body~load_uint(256), proof_data~load_ref(), proof_data~load_ref());
         return ();
     }
 
     if (op == op::update) {
         throw_unless(error::not_owner, equal_slices(sender_address, storage::owner));
-        slice update_data = in_msg_body~load_ref().begin_parse();
-        update(update_data~load_ref(), update_data~load_uint(256), update_data~load_ref());
+        update(in_msg_body~load_ref());
         return ();
     }
 
