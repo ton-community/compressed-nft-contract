@@ -119,13 +119,26 @@ int min_tons_for_storage() asm "50000000 PUSHINT"; ;; 0.05 TON
 
 
     (int init?, int index, slice collection_address, slice owner_address, cell content) = load_data();
-    if (~ init?) {
+
+    int op = in_msg_body~load_uint(32);
+
+    if (op == op::init) {
         throw_unless(405, equal_slices(collection_address, sender_address));
-        store_data(index, collection_address, in_msg_body~load_msg_addr(), in_msg_body~load_ref());
+
+        ifnot (init?) {
+            slice msg_content = in_msg_body~load_ref().begin_parse();
+            store_data(index, collection_address, msg_content~load_msg_addr(), msg_content~load_ref());
+        } else {
+            send_msg(owner_address, 0, op::excesses(), 0, null(), 64);
+        }
+
         return ();
     }
 
-    int op = in_msg_body~load_uint(32);
+    ifnot (init?) {
+        throw(0xffff);
+    }
+
     int query_id = in_msg_body~load_uint(64);
 
     if (op == op::transfer()) {
@@ -136,6 +149,7 @@ int min_tons_for_storage() asm "50000000 PUSHINT"; ;; 0.05 TON
         send_msg(sender_address, 0, op::report_static_data(), query_id, begin_cell().store_uint(index, 256).store_slice(collection_address), 64);  ;; carry all the remaining value of the inbound message
         return ();
     }
+
     throw(0xffff);
 }
 

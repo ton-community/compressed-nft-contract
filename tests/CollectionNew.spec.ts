@@ -248,4 +248,55 @@ describe('Collection', () => {
 
         printTransactionFees(updateResult.transactions);
     });
+
+    it('should return coins for double claim', async () => {
+        const claimer = await blockchain.treasury('claimer');
+
+        const data = beginCell().storeAddress(claimer.address).storeRef(new Cell()).endCell();
+        const merkle = MerkleTree.fromLeaves([bufferToInt(data.hash()), 0n, 0n, 0n], merkleHash);
+
+        const deployer = await blockchain.treasury('deployer');
+
+        collection = blockchain.openContract(CollectionNew.createFromConfig({
+            root: merkle.root(),
+            depth: merkle.depth,
+            itemCode: await compile('Item'),
+            owner: deployer.address,
+            content: new Cell(),
+            royalty: new Cell(),
+            apiVersion: 1,
+            apiLink: '',
+        }, code));
+
+        const deployResult = await collection.sendDeploy(deployer.getSender(), toNano('0.05'));
+
+        expect(deployResult.transactions).toHaveTransaction({
+            from: deployer.address,
+            to: collection.address,
+            deploy: true,
+            success: true,
+        });
+
+        const itemAddress = await collection.getItemAddress(0n);
+
+        const claimResult = await collection.sendClaim(claimer.getSender(), {
+            index: 0n, data, proof: merkle.proofForNode(4)
+        });
+
+        expect(claimResult.transactions).toHaveTransaction({
+            from: collection.address,
+            on: itemAddress,
+            success: true,
+        });
+
+        const claimAgainResult = await collection.sendClaim(claimer.getSender(), {
+            index: 0n, data, proof: merkle.proofForNode(4)
+        });
+
+        expect(claimAgainResult.transactions).toHaveTransaction({
+            from: itemAddress,
+            to: claimer.address,
+            op: 0xd53276db,
+        });
+    });
 });

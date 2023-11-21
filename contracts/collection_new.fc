@@ -15,9 +15,6 @@ const int error::not_owner = 100;
 const int error::bad_proof = 101;
 const int error::value_too_low = 102;
 
-const int op::claim = "op::claim"c;
-const int op::update = "op::update"c;
-
 const int item_init_value = 30000000;
 const int minimum_claim_value = 85000000;
 
@@ -96,7 +93,7 @@ slice calculate_nft_item_address(cell state_init) {
         .store_coins(amount)
         .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
         .store_ref(state_init)
-        .store_ref(nft_message);
+        .store_ref(begin_cell().store_uint(op::init, 32).store_ref(nft_message).end_cell());
     send_raw_message(msg.end_cell(), 1); ;; pay transfer fees separately, revert on errors
 }
 

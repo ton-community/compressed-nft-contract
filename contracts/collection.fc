@@ -111,7 +111,7 @@ slice calculate_nft_item_address(cell state_init) {
         .store_coins(amount)
         .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
         .store_ref(state_init)
-        .store_ref(nft_message);
+        .store_ref(begin_cell().store_uint(op::init, 32).store_ref(nft_message).end_cell());
     send_raw_message(msg.end_cell(), 1); ;; pay transfer fees separately, revert on errors
 }
 
