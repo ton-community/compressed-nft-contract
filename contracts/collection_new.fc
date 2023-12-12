@@ -91,7 +91,7 @@ slice calculate_nft_item_address(cell state_init) {
     cell state_init = calculate_nft_item_state_init(item_index, storage::nft_item_code);
     slice nft_address = calculate_nft_item_address(state_init);
     var msg = begin_cell()
-        .store_uint(0x18, 6)
+        .store_uint(0x10, 6)
         .store_slice(nft_address)
         .store_coins(amount)
         .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
