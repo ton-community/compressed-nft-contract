@@ -53,17 +53,17 @@ function buildUpdateCell(updates: UpdateItem[], hashes: { index: number, value: 
     return beginCell().storeBit(false).storeRef(left).storeRef(right).endCell();
 }
 
-export class CollectionNew implements Contract {
+export class CollectionExotic implements Contract {
     constructor(readonly address: Address, readonly init?: { code: Cell; data: Cell }) {}
 
     static createFromAddress(address: Address) {
-        return new CollectionNew(address);
+        return new CollectionExotic(address);
     }
 
     static createFromConfig(config: CollectionConfig, code: Cell, workchain = 0) {
         const data = collectionConfigToCell(config);
         const init = { code, data };
-        return new CollectionNew(contractAddress(workchain, init), init);
+        return new CollectionExotic(contractAddress(workchain, init), init);
     }
 
     async sendDeploy(provider: ContractProvider, via: Sender, value: bigint) {
@@ -93,47 +93,20 @@ export class CollectionNew implements Contract {
         });
     }
 
-    async sendClaim(provider: ContractProvider, via: Sender, params: {
+    async sendPremadeUpdate(provider: ContractProvider, via: Sender, params: {
         queryId?: bigint,
-        index: bigint,
-        data: Cell,
-        proof: bigint[],
+        updateCell: Cell,
         value?: bigint,
     }) {
-        const pb: Builder[] = params.proof.map(e => beginCell().storeUint(e, 256));
-        let proofCell = new Cell();
-        while (pb.length > 0) {
-            proofCell = pb.pop()!.storeRef(proofCell).endCell();
-        }
-
-        await this.sendPremadeProof(provider, via, {
-            queryId: params.queryId,
-            value: params.value,
-            index: params.index,
-            proofCell: beginCell()
-                .storeRef(params.data)
-                .storeRef(proofCell)
-                .endCell()
-        });
-    }
-
-    async sendUpdate(provider: ContractProvider, via: Sender, params: {
-        queryId?: bigint,
-        updates: UpdateItem[],
-        hashes: { index: number, value: bigint }[],
-        value?: bigint,
-    }) {
-        const body = beginCell()
-            .storeUint(0x23cd52c, 32)
-            .storeUint(params.queryId ?? 0, 64)
-            .storeRef(buildUpdateCell(params.updates, params.hashes, 1))
-            .endCell();
-
         await provider.internal(via, {
             value: params.value ?? toNano('0.5'),
             bounce: true,
             sendMode: SendMode.PAY_GAS_SEPARATELY,
-            body,
+            body: beginCell()
+                .storeUint(0x23cd52c, 32)
+                .storeUint(params.queryId ?? 0, 64)
+                .storeRef(params.updateCell)
+                .endCell(),
         });
     }
 
