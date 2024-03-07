@@ -623,3 +623,4 @@ int equal_slices(slice a, slice b) asm "SDEQ";
 
 ;;; Concatenates two builders
 builder store_builder(builder to, builder from) asm "STBR";
+int builder_null?(builder b) asm "ISNULL";
