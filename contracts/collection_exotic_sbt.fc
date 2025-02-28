@@ -22,6 +22,8 @@ const int error::invalid_zero_hashes = 107;
 
 const int op::claim = "op::claim"c;
 const int op::update = "op::update"c;
+const int op::withdraw = "op::withdraw"c;
+const int op::excesses = "op::excesses"c;
 
 const int item_init_value = 30000000;
 const int minimum_claim_value = 85000000;
@@ -172,6 +174,8 @@ cell retrieve_child(cell c, int index, int depth) {
 
     storage::merkle_root = new_hash;
 
+    send_ex
+
     save_data();
 }
 
@@ -216,6 +220,22 @@ cell retrieve_child(cell c, int index, int depth) {
     if (op == op::update) {
         throw_unless(error::not_owner, equal_slices(sender_address, storage::owner));
         update(in_msg_body~load_ref());
+        return ();
+    }
+
+    if (op == op::withdraw) {
+        throw_unless(error::not_owner, equal_slices(sender_address, storage::owner));
+        
+        raw_reserve(50000000, 0);
+
+        var msg = begin_cell()
+            .store_uint(0x18, 6) 
+            .store_slice(sender_address)
+            .store_coins(0)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(op::excesses(), 32)
+            .store_uint(query_id, 64);
+        send_raw_message(msg.end_cell(), 128);
         return ();
     }
 
