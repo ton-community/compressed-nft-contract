@@ -14,6 +14,7 @@ global cell storage::api_data;
 const int error::not_owner = 100;
 const int error::bad_proof = 101;
 const int error::value_too_low = 102;
+const int error::index_too_high = 103;
 
 const int op::claim = "op::claim"c;
 const int op::update = "op::update"c;
@@ -101,6 +102,8 @@ slice calculate_nft_item_address(cell state_init) {
 }
 
 () claim(int nft_index, cell nft_data, cell proof) impure {
+    throw_if(error::index_too_high, nft_index >= (1 << storage::merkle_depth));
+
     throw_unless(error::bad_proof, check_proof(storage::merkle_root, proof, nft_data.cell_hash(), nft_index, storage::merkle_depth));
 
     (slice owner, cell content) = nft_data.parse_nft_data();
