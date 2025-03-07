@@ -23,7 +23,6 @@ const int error::invalid_zero_hashes = 107;
 const int op::claim = "op::claim"c;
 const int op::update = "op::update"c;
 const int op::withdraw = "op::withdraw"c;
-const int op::excesses = "op::excesses"c;
 
 const int item_init_value = 30000000;
 const int minimum_claim_value = 85000000;
@@ -37,7 +36,7 @@ cell zero_hashes_dict() asm " B{b5ee9c7241023b010004ab000201c71c010201200d020201
 int zero_hash(int depth) {
     (slice data, int found) = zero_hashes_dict().udict_get?(8, depth);
     throw_unless(error::invalid_zero_hashes, found);
-
+    
     return data.preload_uint(256);
 }
 
