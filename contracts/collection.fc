@@ -207,6 +207,31 @@ slice calculate_nft_item_address(cell state_init) {
         throw_unless(error::not_owner, equal_slices(sender_address, storage::owner));
         slice update_data = in_msg_body~load_ref().begin_parse();
         update(update_data~load_ref(), update_data~load_uint(256), update_data~load_ref());
+
+        var msg = begin_cell()
+            .store_uint(0x18, 6) 
+            .store_slice(sender_address)
+            .store_coins(0)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(op::excesses(), 32)
+            .store_uint(query_id, 64);
+        send_raw_message(msg.end_cell(), 64);
+        return ();
+    }
+
+    if (op == op::withdraw) {
+        throw_unless(error::not_owner, equal_slices(sender_address, storage::owner));
+        
+        raw_reserve(50000000, 0);
+
+        var msg = begin_cell()
+            .store_uint(0x18, 6) 
+            .store_slice(sender_address)
+            .store_coins(0)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(op::excesses(), 32)
+            .store_uint(query_id, 64);
+        send_raw_message(msg.end_cell(), 128);
         return ();
     }
 
