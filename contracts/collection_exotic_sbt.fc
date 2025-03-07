@@ -19,6 +19,7 @@ const int error::not_merkle_proof = 104;
 const int error::wrong_hash = 105;
 const int error::bad_update = 106;
 const int error::invalid_zero_hashes = 107;
+const int error::index_too_high = 108;
 
 const int op::claim = "op::claim"c;
 const int op::update = "op::update"c;
@@ -131,6 +132,8 @@ cell retrieve_child(cell c, int index, int depth) {
 }
 
 () claim(int nft_index, cell proof) impure {
+    throw_if(error::index_too_high, nft_index >= (1 << storage::merkle_depth));
+
     cell struct = proof.check_merkle_proof(storage::merkle_root);
     cell nft_data = struct.retrieve_child(nft_index, storage::merkle_depth);
 
@@ -152,7 +155,7 @@ cell retrieve_child(cell c, int index, int depth) {
         throw_unless(error::bad_update, ty_lvl == 0x0101);
 
         int old_hash = s~load_uint(256);
-        throw_unless(error::bad_update, old_hash = zero_hash(depth));
+        throw_unless(error::bad_update, old_hash == zero_hash(depth));
     } else {
         slice s_old = old.begin_parse();
         slice s_new = new.begin_parse();
