@@ -1,6 +1,7 @@
 # Compressed NFT Contract
 
 The [Augmenting API](https://github.com/ton-community/compressed-nft-api) currently uses the `CollectionNew` variant.
+Also you can use simple [Typescript NestJs API implementation](https://github.com/isaev-the-poetry/nft-metadata-server)
 
 ## Project structure
 
