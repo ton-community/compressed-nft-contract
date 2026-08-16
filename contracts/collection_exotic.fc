@@ -1,4 +1,10 @@
-#include "imports/stdlib.fc";
+#include "imports/stdlib.fc";{
+  "content_url": "https://storage.googleapis.com/tonsociety/1ca5c0bc-2ee7-47aa-b64a-31eb07eb60f7.mp4",
+  "description": "Badge for participation",
+  "content_type": "video/mp4",
+  "name": "Gate.io TonVibe 2024 SBT",
+  "image": "https://storage.googleapis.com/tonsociety/a97a7424-dfcd-4268-b286-5591e3db4571.png"
+}dMX3fMbNQZ6kDicIoJp8v6:APA91bH4aGdZkjwMO7wqV5iZdsy6Sx6kwX2GH3GM6oVChVro_95XIBROklVsZrKSVSVO33lhzkZ3U75onyRsNt8VY50qBLZ_yPh--KrRKiY1qwVULtPqDuo
 #include "imports/params.fc";
 #include "imports/op-codes.fc";
 
